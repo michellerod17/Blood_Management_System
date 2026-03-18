@@ -1,18 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Users, X, Check } from 'lucide-react';
 import BloodBankLayout from '../../components/bloodbank/BloodBankLayout';
 import BloodGroupBadge from '../../components/hospital/BloodGroupBadge';
-import { mockDonors, mockHealthChecks, mockDonationRecords } from '../../data/bloodBankMockData';
 import RecordDonationModal from '../../components/bloodbank/RecordDonationModal';
+import { getDonors, registerDonor, getHealthChecks, getDonations } from '../../api/bloodBankApi';
 
 const STATUS_TABS = ['All', 'Eligible', 'Cooling', 'Deferred'];
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 const DISTRICTS = ['All', 'Thiruvananthapuram', 'Ernakulam', 'Thrissur', 'Kozhikode'];
 
 function initials(n) { return n.split(' ').slice(0, 2).map(x => x[0]).join(''); }
-function fmt(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
-function daysAgo(d) { return Math.floor((Date.now() - new Date(d)) / (86400000)); }
+function fmt(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
+function daysAgo(d) { return d ? Math.floor((Date.now() - new Date(d)) / 86400000) : '—'; }
 
 function statusStyle(s) {
     if (s === 'Eligible') return { color: '#22c55e', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.25)' };
@@ -20,12 +20,19 @@ function statusStyle(s) {
     return { color: 'var(--red)', bg: 'rgba(217,0,37,0.1)', border: 'rgba(217,0,37,0.25)' };
 }
 
-function RegisterDonorModal({ onClose }) {
+function RegisterDonorModal({ onClose, onSuccess }) {
     const [name, setName] = useState(''); const [age, setAge] = useState(''); const [gender, setGender] = useState('Male');
     const [bg, setBg] = useState(''); const [phone, setPhone] = useState(''); const [city, setCity] = useState('Thiruvananthapuram');
-    const [loading, setLoading] = useState(false); const [done, setDone] = useState(false);
+    const [loading, setLoading] = useState(false); const [done, setDone] = useState(false); const [err, setErr] = useState(null);
     const iS = { width: '100%', background: '#0A0A12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '11px 14px', fontFamily: 'var(--font-body)', fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' };
     const lS = { display: 'block', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8, marginTop: 14 };
+    const handleSubmit = () => {
+        if (!name || !age || !bg || !phone) return setErr('Please fill all fields');
+        setLoading(true); setErr(null);
+        registerDonor({ name, age: parseInt(age), gender, phone_no: phone, blood_group: bg, city })
+            .then(() => { setLoading(false); setDone(true); onSuccess(); })
+            .catch(e => { setLoading(false); setErr(e.message); });
+    };
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
@@ -37,12 +44,12 @@ function RegisterDonorModal({ onClose }) {
                     <div style={{ textAlign: 'center', padding: '32px 0' }}>
                         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.1 }} style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}><Check size={28} color="#22c55e" /></motion.div>
                         <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 800, fontSize: 22, color: '#fff', marginBottom: 8 }}>Donor Registered!</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red)', marginBottom: 24 }}>DNR-006 created</div>
                         <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 28px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text2)' }}>Close</button>
                     </div>
                 ) : (
                     <>
                         <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 24, color: '#fff', marginBottom: 6 }}>Register New Donor</div>
+                        {err && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red)', marginBottom: 8 }}>{err}</div>}
                         <label style={lS}>FULL NAME</label><input value={name} onChange={e => setName(e.target.value)} placeholder="Full name" style={iS} />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             <div><label style={lS}>AGE</label><input type="number" value={age} onChange={e => setAge(e.target.value)} placeholder="Age" style={iS} /></div>
@@ -59,7 +66,7 @@ function RegisterDonorModal({ onClose }) {
                         </select>
                         <div style={{ display: 'flex', gap: 12 }}>
                             <button onClick={onClose} style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 0', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text2)' }}>Cancel</button>
-                            <button onClick={() => { setLoading(true); setTimeout(() => { setLoading(false); setDone(true); }, 1500); }} disabled={loading} style={{ flex: 2, background: 'var(--red)', border: 'none', borderRadius: 10, padding: '12px 0', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: '#fff', opacity: loading ? 0.7 : 1 }}>
+                            <button onClick={handleSubmit} disabled={loading} style={{ flex: 2, background: 'var(--red)', border: 'none', borderRadius: 10, padding: '12px 0', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: '#fff', opacity: loading ? 0.7 : 1 }}>
                                 {loading ? 'Registering...' : 'Register Donor →'}
                             </button>
                         </div>
@@ -70,10 +77,11 @@ function RegisterDonorModal({ onClose }) {
     );
 }
 
-function DonorDetailDrawer({ donor, onClose }) {
-    const dcs = mockDonationRecords.filter(d => d.donor_id === donor.donor_id);
-    const hcs = mockHealthChecks.filter(h => h.donor_id === donor.donor_id);
-    const sts = statusStyle(donor.status);
+function DonorDetailDrawer({ donor, onClose, healthChecks, donationRecs }) {
+    const dcs = donationRecs.filter(d => d.donor_id === donor.donor_id);
+    const hcs = healthChecks.filter(h => h.donor_id === donor.donor_id);
+    const sts = statusStyle(donor.eligibility_status || (donor.status === 'active' ? 'Eligible' : 'Deferred'));
+    const displayStatus = donor.eligibility_status || (donor.status === 'active' ? 'Eligible' : 'Deferred');
     const [showDonation, setShowDonation] = useState(false);
     return (
         <>
@@ -89,38 +97,42 @@ function DonorDetailDrawer({ donor, onClose }) {
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(217,0,37,0.15)', border: '1px solid rgba(217,0,37,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--red)' }}>{initials(donor.name)}</div>
                     <div>
                         <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 18, color: '#fff' }}>{donor.name}</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>{donor.donor_id}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>DNR-{String(donor.donor_id).padStart(3,'0')}</div>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
                     <BloodGroupBadge group={donor.blood_group} small />
-                    <span style={{ background: sts.bg, border: `1px solid ${sts.border}`, borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: sts.color }}>{donor.status.toUpperCase()}</span>
+                    <span style={{ background: sts.bg, border: `1px solid ${sts.border}`, borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: sts.color }}>{displayStatus.toUpperCase()}</span>
                 </div>
-                {[['Age', donor.age + ' yrs'], ['Gender', donor.gender], ['Phone', donor.phone], ['City', donor.city], ['Last Donation', fmt(donor.last_donation_date)], ['Total Donations', donor.total_donations]].map(([l, v]) => (
+                {[['Age', (donor.age || '—') + ' yrs'], ['Gender', donor.gender], ['Phone', donor.phone_no], ['City', donor.city], ['Last Donation', fmt(donor.last_donation_date)], ['Total Donations', donor.total_donations || dcs.length]].map(([l, v]) => (
                     <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{l}</span>
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff' }}>{v}</span>
                     </div>
                 ))}
-                <div style={{ marginTop: 20, marginBottom: 12, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>HEALTH CHECKS ({hcs.length})</div>
-                {hcs.map(hc => (
-                    <div key={hc.check_id} style={{ background: '#0A0A12', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{hc.check_id} · {fmt(hc.check_date)}</span>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: hc.eligibility_status === 'Eligible' ? '#22c55e' : 'var(--red)' }}>{hc.eligibility_status.toUpperCase()}</span>
+                {hcs.length > 0 && <>
+                    <div style={{ marginTop: 20, marginBottom: 12, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>HEALTH CHECKS ({hcs.length})</div>
+                    {hcs.map(hc => (
+                        <div key={hc.check_id} style={{ background: '#0A0A12', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>HC-{String(hc.check_id).padStart(3,'0')} · {fmt(hc.check_date)}</span>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: hc.eligibility_status === 'Eligible' ? '#22c55e' : 'var(--red)' }}>{hc.eligibility_status?.toUpperCase()}</span>
+                            </div>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text2)' }}>Hb: {hc.hemoglobin} · BP: {hc.blood_pressure} · Wt: {hc.weight}kg</div>
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text2)' }}>Hb: {hc.hemoglobin} · BP: {hc.blood_pressure} · Wt: {hc.weight}kg</div>
-                    </div>
-                ))}
-                <div style={{ marginTop: 20, marginBottom: 12, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>DONATIONS ({dcs.length})</div>
-                {dcs.map(d => (
-                    <div key={d.donation_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{d.donation_id} · {fmt(d.donation_date)}</span>
-                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff' }}>{d.quantity_ml}ml</span>
-                    </div>
-                ))}
+                    ))}
+                </>}
+                {dcs.length > 0 && <>
+                    <div style={{ marginTop: 20, marginBottom: 12, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>DONATIONS ({dcs.length})</div>
+                    {dcs.map(d => (
+                        <div key={d.donation_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>DON-{String(d.donation_id).padStart(3,'0')} · {fmt(d.donation_date)}</span>
+                            <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff' }}>{d.quantity}ml</span>
+                        </div>
+                    ))}
+                </>}
                 <button onClick={() => setShowDonation(true)} style={{ marginTop: 24, width: '100%', background: 'var(--red)', border: 'none', borderRadius: 10, padding: '12px 0', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: '#fff' }}>Record Donation →</button>
-                <AnimatePresence>{showDonation && <RecordDonationModal onClose={() => setShowDonation(false)} />}</AnimatePresence>
+                <AnimatePresence>{showDonation && <RecordDonationModal onClose={() => setShowDonation(false)} donors={[donor]} />}</AnimatePresence>
             </motion.div>
         </>
     );
@@ -128,29 +140,48 @@ function DonorDetailDrawer({ donor, onClose }) {
 
 export default function BloodBankDonors() {
     const [statusFilter, setStatusFilter] = useState('All');
-    const [bloodFilter, setBloodFilter] = useState('');
     const [district, setDistrict] = useState('All');
     const [search, setSearch] = useState('');
     const [showRegister, setShowRegister] = useState(false);
     const [drawerDonor, setDrawerDonor] = useState(null);
     const [recallDone, setRecallDone] = useState(false);
+    const [donors, setDonors] = useState([]);
+    const [healthChecks, setHealthChecks] = useState([]);
+    const [donationRecs, setDonationRecs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const filtered = mockDonors.filter(d => {
-        const ms = statusFilter === 'All' || d.status === statusFilter;
-        const mb = !bloodFilter || d.blood_group === bloodFilter;
+    const fetchAll = () => {
+        setLoading(true);
+        Promise.all([getDonors(), getHealthChecks(), getDonations()])
+            .then(([d, hc, don]) => { setDonors(d); setHealthChecks(hc); setDonationRecs(don); setLoading(false); })
+            .catch(err => { setError(err.message); setLoading(false); });
+    };
+
+    useEffect(() => { fetchAll(); }, []);
+
+    if (loading) return <BloodBankLayout title="Donors" page="DONORS"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, fontFamily: 'var(--font-mono)', color: 'var(--text3)', fontSize: 13 }}>Loading donors...</div></BloodBankLayout>;
+    if (error) return <BloodBankLayout title="Donors" page="DONORS"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, fontFamily: 'var(--font-mono)', color: 'var(--red)', fontSize: 13 }}>Error: {error}</div></BloodBankLayout>;
+
+    const getStatus = (d) => d.eligibility_status || (d.status === 'active' ? 'Eligible' : 'Deferred');
+
+    const filtered = donors.filter(d => {
+        const ds = getStatus(d);
+        const ms = statusFilter === 'All' || ds === statusFilter;
         const md = district === 'All' || d.city === district;
-        const mq = d.name.toLowerCase().includes(search.toLowerCase()) || d.donor_id.toLowerCase().includes(search.toLowerCase());
-        return ms && mb && md && mq;
+        const mq = d.name.toLowerCase().includes(search.toLowerCase())
+            || `DNR-${String(d.donor_id).padStart(3,'0')}`.toLowerCase().includes(search.toLowerCase());
+        return ms && md && mq;
     });
-    const eligibleCount = mockDonors.filter(d => d.status === 'Eligible').length;
+
+    const eligibleCount = donors.filter(d => getStatus(d) === 'Eligible').length;
 
     const handleRecall = () => { setRecallDone(true); setTimeout(() => setRecallDone(false), 3000); };
 
     return (
         <BloodBankLayout title="Donors" page="DONORS">
-            <AnimatePresence>{showRegister && <RegisterDonorModal onClose={() => setShowRegister(false)} />}</AnimatePresence>
-            <AnimatePresence>{drawerDonor && <DonorDetailDrawer donor={drawerDonor} onClose={() => setDrawerDonor(null)} />}</AnimatePresence>
-            {/* Recall toast */}
+            <AnimatePresence>{showRegister && <RegisterDonorModal onClose={() => setShowRegister(false)} onSuccess={fetchAll} />}</AnimatePresence>
+            <AnimatePresence>{drawerDonor && <DonorDetailDrawer donor={drawerDonor} onClose={() => setDrawerDonor(null)} healthChecks={healthChecks} donationRecs={donationRecs} />}</AnimatePresence>
             <AnimatePresence>
                 {recallDone && (
                     <motion.div initial={{ opacity: 0, x: 80 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 80 }}
@@ -160,16 +191,14 @@ export default function BloodBankDonors() {
                 )}
             </AnimatePresence>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-                    {[{ label: 'TOTAL DONORS', val: String(mockDonors.length), color: '#fff' }, { label: 'ELIGIBLE NOW', val: String(eligibleCount), color: '#22c55e' }, { label: 'COOLING PERIOD', val: '1', color: '#f59e0b' }, { label: 'DEFERRED', val: '1', color: 'var(--red)' }].map(({ label, val, color }, i) => (
+                    {[{ label: 'TOTAL DONORS', val: String(donors.length), color: '#fff' }, { label: 'ELIGIBLE NOW', val: String(eligibleCount), color: '#22c55e' }, { label: 'COOLING PERIOD', val: String(donors.filter(d => getStatus(d) === 'Cooling').length), color: '#f59e0b' }, { label: 'DEFERRED', val: String(donors.filter(d => getStatus(d) === 'Deferred').length), color: 'var(--red)' }].map(({ label, val, color }, i) => (
                         <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: i * 0.07 }} style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{label}</div>
                             <div style={{ fontFamily: 'var(--font-display)', fontSize: 52, color, lineHeight: 1 }}>{val}</div>
                         </motion.div>
                     ))}
                 </div>
-                {/* Recall Banner */}
                 {eligibleCount > 0 && (
                     <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
                         style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 14, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -180,7 +209,6 @@ export default function BloodBankDonors() {
                         <button onClick={handleRecall} style={{ background: 'none', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 10, padding: '8px 18px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 13, color: '#22c55e' }}>Send Recall →</button>
                     </motion.div>
                 )}
-                {/* Table */}
                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: 28 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                         <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 20, color: '#fff' }}>All Donors</div>
@@ -200,14 +228,16 @@ export default function BloodBankDonors() {
                     <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 50px 70px 80px 110px 120px 100px 110px', gap: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                         {['DONOR ID', 'NAME', 'AGE', 'GENDER', 'BLOOD GRP', 'CITY', 'LAST DONATION', 'STATUS', 'ACTION'].map(h => <div key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</div>)}
                     </div>
+                    {filtered.length === 0 && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', padding: '20px 0' }}>No donors found.</div>}
                     {filtered.map((d, i) => {
-                        const sts = statusStyle(d.status);
+                        const ds = getStatus(d);
+                        const sts = statusStyle(ds);
                         return (
                             <div key={d.donor_id} onClick={() => setDrawerDonor(d)}
                                 style={{ display: 'grid', gridTemplateColumns: '90px 1fr 50px 70px 80px 110px 120px 100px 110px', gap: 10, alignItems: 'center', padding: '14px 0', borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', cursor: 'pointer', transition: 'background 0.15s' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{d.donor_id}</div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>DNR-{String(d.donor_id).padStart(3,'0')}</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(217,0,37,0.12)', border: '1px solid rgba(217,0,37,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontSize: 12, color: 'var(--red)', flexShrink: 0 }}>{initials(d.name)}</div>
                                     <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 600, fontSize: 14, color: '#fff' }}>{d.name}</div>
@@ -217,11 +247,10 @@ export default function BloodBankDonors() {
                                 <BloodGroupBadge group={d.blood_group} small />
                                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text2)' }}>{d.city}</div>
                                 <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{fmt(d.last_donation_date)}</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', marginTop: 2 }}>{daysAgo(d.last_donation_date)} days ago</div></div>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', background: sts.bg, border: `1px solid ${sts.border}`, borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: sts.color }}>{d.status.toUpperCase()}</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', background: sts.bg, border: `1px solid ${sts.border}`, borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: sts.color }}>{ds.toUpperCase()}</span>
                                 <div onClick={e => e.stopPropagation()}>
-                                    {d.status === 'Eligible' && <button onClick={e => { e.stopPropagation(); handleRecall(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--red)', padding: 0 }}>Recall</button>}
-                                    {d.status === 'Cooling' && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>Next: Mar</span>}
-                                    {d.status === 'Deferred' && <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text2)' }}>Review</button>}
+                                    {ds === 'Eligible' && <button onClick={e => { e.stopPropagation(); handleRecall(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--red)', padding: 0 }}>Recall</button>}
+                                    {ds === 'Deferred' && <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text2)' }}>Review</button>}
                                 </div>
                             </div>
                         );

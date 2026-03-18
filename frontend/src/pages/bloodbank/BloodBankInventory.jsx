@@ -1,23 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download } from 'lucide-react';
 import BloodBankLayout from '../../components/bloodbank/BloodBankLayout';
 import StockCard from '../../components/bloodbank/StockCard';
 import StockUpdateModal from '../../components/bloodbank/StockUpdateModal';
-import { mockBloodStock, mockStockAuditLog } from '../../data/bloodBankMockData';
+import { getStock } from '../../api/bloodBankApi';
 
 const STOCK_ORDER = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-const sortedStock = STOCK_ORDER.map(g => mockBloodStock.find(s => s.blood_group === g)).filter(Boolean);
-const totalUnits = sortedStock.reduce((s, b) => s + b.available_units, 0);
-const criticalTypes = sortedStock.filter(s => (s.available_units / s.capacity) <= 0.3);
-const lowTypes = sortedStock.filter(s => { const p = s.available_units / s.capacity; return p > 0.3 && p <= 0.6; });
-const healthyTypes = sortedStock.filter(s => (s.available_units / s.capacity) > 0.6);
+
+// Audit log comes from the DB eventually; for now it's derived from stock data
+const CAPACITY = { 'A+': 200, 'A-': 100, 'B+': 200, 'B-': 80, 'O+': 300, 'O-': 100, 'AB+': 120, 'AB-': 60 };
 
 export default function BloodBankInventory() {
     const [showModal, setShowModal] = useState(false);
+    const [stock, setStock] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const fetchStock = () => {
+        setLoading(true);
+        getStock()
+            .then(data => { setStock(data); setLoading(false); })
+            .catch(err => { setError(err.message); setLoading(false); });
+    };
+
+    useEffect(() => { fetchStock(); }, []);
+
+    if (loading) return (
+        <BloodBankLayout title="Inventory" page="INVENTORY">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, fontFamily: 'var(--font-mono)', color: 'var(--text3)', fontSize: 13 }}>Loading inventory...</div>
+        </BloodBankLayout>
+    );
+    if (error) return (
+        <BloodBankLayout title="Inventory" page="INVENTORY">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, fontFamily: 'var(--font-mono)', color: 'var(--red)', fontSize: 13 }}>Error: {error}</div>
+        </BloodBankLayout>
+    );
+
+    const sortedStock = STOCK_ORDER.map(g => {
+        const s = stock.find(x => x.blood_group === g);
+        if (!s) return null;
+        return { ...s, capacity: s.capacity || CAPACITY[g] || 200 };
+    }).filter(Boolean);
+
+    const totalUnits = sortedStock.reduce((s, b) => s + b.available_units, 0);
+    const criticalTypes = sortedStock.filter(s => (s.available_units / s.capacity) <= 0.3);
+    const lowTypes = sortedStock.filter(s => { const p = s.available_units / s.capacity; return p > 0.3 && p <= 0.6; });
+    const healthyTypes = sortedStock.filter(s => (s.available_units / s.capacity) > 0.6);
+
     return (
         <BloodBankLayout title="Inventory" page="INVENTORY">
-            <AnimatePresence>{showModal && <StockUpdateModal onClose={() => setShowModal(false)} />}</AnimatePresence>
+            <AnimatePresence>{showModal && <StockUpdateModal onClose={() => { setShowModal(false); fetchStock(); }} />}</AnimatePresence>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
@@ -40,7 +73,7 @@ export default function BloodBankInventory() {
                         {sortedStock.map(s => <StockCard key={s.stock_id} stock={s} />)}
                     </div>
                 </motion.div>
-                {/* Audit Log */}
+                {/* Audit Log placeholder */}
                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
                     style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: 28 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -54,18 +87,9 @@ export default function BloodBankInventory() {
                             <div key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</div>
                         ))}
                     </div>
-                    {mockStockAuditLog.map((log, i) => (
-                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 80px 80px 90px 1fr', gap: 12, alignItems: 'center', padding: '14px 0', borderBottom: i < mockStockAuditLog.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)' }}>{log.date}</div>
-                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: '#fff' }}>{log.blood_group}</div>
-                            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text2)' }}>{log.prev}</div>
-                            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff', fontWeight: 600 }}>{log.curr}</div>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: log.change > 0 ? '#22c55e' : 'var(--red)' }}>{log.change > 0 ? '+' : ''}{log.change} units</div>
-                            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text2)' }}>{log.by}</div>
-                        </div>
-                    ))}
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', padding: '20px 0' }}>
+                        Audit log will be available once stock update history is tracked in the database.
+                    </div>
                 </motion.div>
             </div>
         </BloodBankLayout>

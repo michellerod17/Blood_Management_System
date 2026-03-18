@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -5,54 +6,72 @@ import {
     Users, Droplets, HeartPulse, Inbox,
     CreditCard, User, Settings, LogOut,
 } from 'lucide-react';
-import { mockBloodBank, mockBloodStock, mockIncomingRequests, mockDonors } from '../../data/bloodBankMockData';
-
-const totalUnits = mockBloodStock.reduce((s, b) => s + b.available_units, 0);
-const pendingRequests = mockIncomingRequests.filter(r => r.status === 'Pending').length;
-const emergencyCount = mockIncomingRequests.filter(r => r.priority === 'Emergency' && r.status === 'Pending').length;
-const eligibleDonors = mockDonors.filter(d => d.status === 'Eligible').length;
-const lowStock = mockBloodStock.filter(s => (s.available_units / s.capacity) <= 0.3).length;
-
-const NAV = [
-    {
-        section: 'OVERVIEW', items: [
-            { to: '/bloodbank/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-            { to: '/bloodbank/notifications', icon: Bell, label: 'Notifications', badge: emergencyCount > 0 ? `${emergencyCount} emergency` : null },
-        ]
-    },
-    {
-        section: 'BLOOD STOCK', items: [
-            { to: '/bloodbank/inventory', icon: Package, label: 'Inventory', badge: lowStock > 0 ? `${lowStock} Low` : null, badgeColor: '#f59e0b' },
-            { to: '/bloodbank/issues', icon: ArrowUpRight, label: 'Blood Issues' },
-        ]
-    },
-    {
-        section: 'DONORS', items: [
-            { to: '/bloodbank/donors', icon: Users, label: 'Donors', badge: `${eligibleDonors} Eligible`, badgeColor: '#22c55e' },
-            { to: '/bloodbank/donations', icon: Droplets, label: 'Donations' },
-            { to: '/bloodbank/health-checks', icon: HeartPulse, label: 'Health Checks' },
-        ]
-    },
-    {
-        section: 'REQUESTS', items: [
-            { to: '/bloodbank/requests', icon: Inbox, label: 'Incoming Requests', badge: pendingRequests > 0 ? `${pendingRequests} Pending` : null },
-        ]
-    },
-    {
-        section: 'FINANCE', items: [
-            { to: '/bloodbank/payments', icon: CreditCard, label: 'Payments' },
-        ]
-    },
-    {
-        section: 'ACCOUNT', items: [
-            { to: '/bloodbank/profile', icon: User, label: 'Profile' },
-            { to: '/bloodbank/profile', icon: Settings, label: 'Settings' },
-        ]
-    },
-];
+import { getDashboard, getBloodBank } from '../../api/bloodBankApi';
 
 export default function BloodBankSidebar() {
     const navigate = useNavigate();
+    const [totalUnits, setTotalUnits] = useState(0);
+    const [pendingRequests, setPendingRequests] = useState(0);
+    const [emergencyCount, setEmergencyCount] = useState(0);
+    const [eligibleDonors, setEligibleDonors] = useState(0);
+    const [lowStock, setLowStock] = useState(0);
+    const [bankName, setBankName] = useState('Blood Bank');
+    const [city, setCity] = useState('Kerala');
+    const [nacoNumber, setNacoNumber] = useState('');
+
+    useEffect(() => {
+        getDashboard().then(data => {
+            setTotalUnits((data.stock || []).reduce((s, b) => s + b.available_units, 0));
+            setPendingRequests((data.requests || []).filter(r => r.status === 'Pending').length);
+            setEmergencyCount((data.requests || []).filter(r => r.priority === 'Emergency' && r.status === 'Pending').length);
+            setEligibleDonors((data.donorStats || []).find(d => d.status === 'active')?.count || 0);
+            setLowStock((data.stock || []).filter(s => (s.available_units / (s.capacity || 200)) <= 0.3).length);
+        }).catch(() => {});
+        getBloodBank().then(bank => {
+            setBankName(bank.bank_name);
+            setCity(bank.city);
+            setNacoNumber(bank.contact_no || '');
+        }).catch(() => {});
+    }, []);
+
+    const NAV = [
+        {
+            section: 'OVERVIEW', items: [
+                { to: '/bloodbank/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                { to: '/bloodbank/notifications', icon: Bell, label: 'Notifications', badge: emergencyCount > 0 ? `${emergencyCount} emergency` : null },
+            ]
+        },
+        {
+            section: 'BLOOD STOCK', items: [
+                { to: '/bloodbank/inventory', icon: Package, label: 'Inventory', badge: lowStock > 0 ? `${lowStock} Low` : null, badgeColor: '#f59e0b' },
+                { to: '/bloodbank/issues', icon: ArrowUpRight, label: 'Blood Issues' },
+            ]
+        },
+        {
+            section: 'DONORS', items: [
+                { to: '/bloodbank/donors', icon: Users, label: 'Donors', badge: eligibleDonors > 0 ? `${eligibleDonors} Eligible` : null, badgeColor: '#22c55e' },
+                { to: '/bloodbank/donations', icon: Droplets, label: 'Donations' },
+                { to: '/bloodbank/health-checks', icon: HeartPulse, label: 'Health Checks' },
+            ]
+        },
+        {
+            section: 'REQUESTS', items: [
+                { to: '/bloodbank/requests', icon: Inbox, label: 'Incoming Requests', badge: pendingRequests > 0 ? `${pendingRequests} Pending` : null },
+            ]
+        },
+        {
+            section: 'FINANCE', items: [
+                { to: '/bloodbank/payments', icon: CreditCard, label: 'Payments' },
+            ]
+        },
+        {
+            section: 'ACCOUNT', items: [
+                { to: '/bloodbank/profile', icon: User, label: 'Profile' },
+                { to: '/bloodbank/profile', icon: Settings, label: 'Settings' },
+            ]
+        },
+    ];
+
     return (
         <motion.aside
             initial={{ x: -240, opacity: 0 }}
@@ -76,9 +95,9 @@ export default function BloodBankSidebar() {
                 <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(217,0,37,0.1)', border: '1px solid rgba(217,0,37,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                     <Droplets size={20} color="var(--red)" />
                 </div>
-                <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 15, color: '#fff', marginBottom: 3 }}>{mockBloodBank.bank_name}</div>
+                <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 15, color: '#fff', marginBottom: 3 }}>{bankName}</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--red)', marginBottom: 6, letterSpacing: '0.05em' }}>BLOOD BANK · ADMIN</div>
-                <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>{mockBloodBank.city}, Kerala</div>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text3)', marginBottom: 10 }}>{city}, Kerala</div>
                 <span style={{ display: 'inline-block', background: 'rgba(217,0,37,0.1)', border: '1px solid rgba(217,0,37,0.3)', borderRadius: 100, padding: '2px 10px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--red)' }}>
                     {totalUnits} Units In Stock
                 </span>
@@ -116,7 +135,7 @@ export default function BloodBankSidebar() {
             <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
                 <div style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>NACO REG</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#fff' }}>{mockBloodBank.naco_number}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#fff' }}>{nacoNumber}</div>
                 </div>
                 <button onClick={() => navigate('/login')}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text3)', padding: 0 }}

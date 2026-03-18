@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { X, Check } from 'lucide-react';
-import { mockBloodStock } from '../../data/bloodBankMockData';
+import { getStock, updateStock } from '../../api/bloodBankApi';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
@@ -12,13 +12,22 @@ export default function StockUpdateModal({ onClose, preselected }) {
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
     const [done, setDone] = useState(false);
+    const [err, setErr] = useState(null);
+    const [stock, setStock] = useState([]);
 
-    const currentStock = mockBloodStock.find(s => s.blood_group === group);
+    useEffect(() => {
+        getStock().then(setStock).catch(() => {});
+    }, []);
+
+    const currentStock = stock.find(s => s.blood_group === group);
     const currentUnits = currentStock?.available_units || 0;
 
     const handleSubmit = () => {
-        setLoading(true);
-        setTimeout(() => { setLoading(false); setDone(true); }, 1500);
+        if (!group || !newUnits) return;
+        setLoading(true); setErr(null);
+        updateStock(group, parseInt(newUnits), action)
+            .then(() => { setLoading(false); setDone(true); })
+            .catch(e => { setLoading(false); setErr(e.message); });
     };
 
     const iS = { width: '100%', background: '#0A0A12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '11px 14px', fontFamily: 'var(--font-body)', fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' };
@@ -39,13 +48,13 @@ export default function StockUpdateModal({ onClose, preselected }) {
                             <Check size={28} color="#22c55e" />
                         </motion.div>
                         <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 800, fontSize: 22, color: '#fff', marginBottom: 8 }}>Stock Updated!</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#22c55e', marginBottom: 8 }}>Audit log recorded.</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#22c55e', marginBottom: 8 }}>Database updated successfully.</div>
                         <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 28px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--text2)', marginTop: 16 }}>Close</button>
                     </div>
                 ) : (
                     <>
                         <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 24, color: '#fff', marginBottom: 4 }}>Update Blood Stock</div>
-                        <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>{mockBloodStock[0] ? 'KIMS Blood Bank' : ''}</div>
+                        {err && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red)', marginBottom: 8 }}>{err}</div>}
 
                         <label style={lS}>BLOOD GROUP</label>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -63,7 +72,7 @@ export default function StockUpdateModal({ onClose, preselected }) {
                                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', marginTop: 4 }}>units</div>
                                     </div>
                                     <div>
-                                        <label style={{ ...lS, marginTop: 0 }}>NEW UNIT COUNT</label>
+                                        <label style={{ ...lS, marginTop: 0 }}>UNIT COUNT TO {action === 'add' ? 'ADD' : 'REMOVE'}</label>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button onClick={() => setNewUnits(v => Math.max(0, (parseInt(v) || 0) - 1).toString())} style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, cursor: 'pointer', color: '#fff', fontSize: 18 }}>−</button>
                                             <input type="number" value={newUnits} onChange={e => setNewUnits(e.target.value)} placeholder="0" style={{ ...iS, textAlign: 'center', flex: 1 }} />

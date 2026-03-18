@@ -36,9 +36,46 @@ router.post('/', (req, res) => {
 
 
 // =============================
-// GET ALL BLOOD REQUESTS
+// GET SIMPLE BLOOD REQUESTS
 // =============================
-router.get('/', (req, res) => {
+router.get('/simple', (req, res) => {
+
+    const query = `
+        SELECT 
+            br.request_id,
+            h.hospital_name,
+            br.patient_id,
+            p.name AS patient_name,
+            br.bank_id,
+            p.blood_group,
+            br.units_required,
+            br.request_date,
+            br.status,
+            'Routine' AS priority
+        FROM blood_request br
+        JOIN hospital h 
+            ON br.hospital_id = h.hospital_id
+        JOIN patient p 
+            ON br.patient_id = p.patient_id
+        ORDER BY br.request_date DESC
+    `;
+
+    db.query(query, (err, results) => {
+
+        if (err) {
+            console.error("GET SIMPLE ERROR:", err);
+            return res.status(500).json({ message: "Server Error" });
+        }
+
+        res.json(results);
+    });
+});
+
+
+// =============================
+// GET DETAILED BLOOD REQUESTS
+// =============================
+router.get('/detailed', (req, res) => {
 
     const query = `
         SELECT 
@@ -47,6 +84,7 @@ router.get('/', (req, res) => {
             br.patient_id,
             br.bank_id,
             br.units_required,
+
             CONCAT(UCASE(LEFT(br.status, 1)), LCASE(SUBSTRING(br.status, 2))) AS status,
             br.request_date,
 
@@ -79,7 +117,7 @@ router.get('/', (req, res) => {
     db.query(query, (err, results) => {
 
         if (err) {
-            console.error("GET ERROR:", err);
+            console.error("GET DETAILED ERROR:", err);
             return res.status(500).json({ message: "Server Error" });
         }
 
@@ -89,12 +127,16 @@ router.get('/', (req, res) => {
 
 
 // =============================
-// UPDATE REQUEST STATUS (MAIN ROUTE ✅)
+// UPDATE REQUEST STATUS
 // =============================
 router.put('/:id/status', (req, res) => {
 
     const { status } = req.body;
     const requestId = req.params.id;
+
+    if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+    }
 
     const query = `
         UPDATE blood_request
@@ -117,7 +159,7 @@ router.put('/:id/status', (req, res) => {
 
 
 // =============================
-// OPTIONAL: QUICK APPROVE ROUTE
+// QUICK APPROVE
 // =============================
 router.put('/approve/:id', (req, res) => {
 
@@ -140,7 +182,7 @@ router.put('/approve/:id', (req, res) => {
 
 
 // =============================
-// OPTIONAL: QUICK REJECT ROUTE
+// QUICK REJECT
 // =============================
 router.put('/reject/:id', (req, res) => {
 

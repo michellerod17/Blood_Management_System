@@ -1,6 +1,11 @@
 const mysql = require("mysql2");
 require("dotenv").config();
 
+  uri: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+
 const db = mysql.createPool({
   uri: process.env.DATABASE_URL,
   waitForConnections: true,

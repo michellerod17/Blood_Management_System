@@ -43,7 +43,7 @@ app.use("/hospitals", hospitalRoutes);
 
 app.use("/hospital-dashboard", hospitalDashboardRoutes);
 
-// FIXED: Payment routes should NOT use "/"
+// Payment routes
 app.use("/payments", paymentRoutes);
 
 app.use("/admin", adminRoutes);
