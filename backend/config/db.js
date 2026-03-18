@@ -1,12 +1,9 @@
 const mysql = require("mysql2");
 require("dotenv").config();
 
-const db = mysql.createConnection({
-  uri: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
+const db = mysql.createConnection(
+  process.env.DATABASE_URL
+);
 
 db.connect((err) => {
   if (err) {
@@ -15,3 +12,5 @@ db.connect((err) => {
     console.log("Connected to Railway MySQL database!");
   }
 });
+
+module.exports = db;
