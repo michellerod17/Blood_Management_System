@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Clock, Check, X, FileText } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import StatusBadge from '../../components/hospital/StatusBadge';
-import { mockPendingApprovals } from '../../data/adminMockData';
+
 
 function fmt(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
 
 export default function AdminApprovals() {
-    const [approvals, setApprovals] = useState(mockPendingApprovals);
     const [typeFilter, setTypeFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
     const [search, setSearch] = useState('');
@@ -16,10 +15,51 @@ export default function AdminApprovals() {
     const [rejectReason, setRejectReason] = useState('Incomplete documentation');
     const [rejectNotes, setRejectNotes] = useState('');
     const [toast, setToast] = useState(null);
+    const [approvals, setApprovals] = useState([]);
+useEffect(() => {
+    fetch("http://localhost:5000/blood-requests")
+        .then(res => res.json())
+        .then(data => {
+
+            const mapped = data
+    .filter(r => r.status === "pending")   // ✅ ONLY PENDING
+    .map(r => ({
+        id: r.request_id,
+        type: "Hospital",
+        org_name: r.hospital_name,
+        city: "Kerala",
+        submitted: r.request_date,
+        ref: `REQ-${r.request_id}`,
+        contact: r.patient_name,
+        status: "Pending"
+    }));
+
+            setApprovals(mapped);
+        });
+}, []);
 
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
-    const handleApprove = id => { setApprovals(a => a.filter(x => x.id !== id)); showToast('Application approved successfully'); };
-    const handleReject = () => { setApprovals(a => a.filter(x => x.id !== rejectModal)); setRejectModal(null); showToast('Application rejected. Email sent to applicant.', 'error'); };
+   const handleApprove = async (id) => {
+    await fetch(`http://localhost:5000/blood-requests/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Approved" })
+    });
+
+    setApprovals(a => a.filter(x => x.id !== id));
+    showToast('Application approved successfully');
+};
+   const handleReject = async () => {
+    await fetch(`http://localhost:5000/blood-requests/${rejectModal}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Rejected" })
+    });
+
+    setApprovals(a => a.filter(x => x.id !== rejectModal));
+    setRejectModal(null);
+    showToast('Application rejected.', 'error');
+};
 
     const filtered = approvals.filter(a => {
         if (typeFilter !== 'All' && a.type !== typeFilter) return false;
@@ -29,7 +69,7 @@ export default function AdminApprovals() {
     });
 
     const pendingC = approvals.filter(a => a.status === 'Pending').length;
-    const reviewC = approvals.filter(a => a.status === 'Under Review').length;
+    const reviewC = approvals.filter(a => a.status === 'Approved').length;
     const iS = { width: '100%', background: '#0A0A12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '11px 14px', fontFamily: 'var(--font-body)', fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' };
 
     return (

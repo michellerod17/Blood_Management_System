@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import BloodGroupBadge from '../../components/hospital/BloodGroupBadge';
-import { mockAllDonors } from '../../data/adminMockData';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 function fmt(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
@@ -13,17 +12,28 @@ export default function AdminDonors() {
     const [bloodFilter, setBloodFilter] = useState('');
     const [search, setSearch] = useState('');
     const [expanded, setExpanded] = useState(null);
-
-    const filtered = mockAllDonors.filter(d => {
+    const [donors, setDonors] = useState([]);
+    useEffect(() => {
+    fetch("http://localhost:5000/donors")
+        .then(res => res.json())
+        .then(data => setDonors(data))
+        .catch(err => console.error(err));
+}, []);
+    const mappedDonors = donors.map(d => ({
+    ...d,
+    status: d.status === "active" ? "Eligible" : "Deferred",
+    total_donations: d.total_donations || 1
+}));
+    const filtered = mappedDonors.filter(d => {
         if (statusFilter !== 'All' && d.status !== statusFilter) return false;
         if (bloodFilter && d.blood_group !== bloodFilter) return false;
-        if (search && !d.name.toLowerCase().includes(search.toLowerCase()) && !d.donor_id.toLowerCase().includes(search.toLowerCase())) return false;
+        if (search && !d.name.toLowerCase().includes(search.toLowerCase()) && !d.donor_id.toString().includes(search.toLowerCase())) return false;
         return true;
     });
 
-    const eligible = mockAllDonors.filter(d => d.status === 'Eligible').length;
-    const cooling = mockAllDonors.filter(d => d.status === 'Cooling').length;
-    const deferred = mockAllDonors.filter(d => d.status === 'Deferred').length;
+    const eligible = mappedDonors.filter(d => d.status === 'Eligible').length;
+    const cooling =mappedDonors.filter(d => d.status === 'Cooling').length;
+    const deferred = mappedDonors.filter(d => d.status === 'Deferred').length;
     const stColor = s => s === 'Eligible' ? '#22c55e' : s === 'Cooling' ? '#f59e0b' : 'var(--red)';
 
     return (
@@ -31,7 +41,12 @@ export default function AdminDonors() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-                    {[{ l: 'TOTAL DONORS', v: '12,480', c: '#fff' }, { l: 'ELIGIBLE', v: '8,340', c: '#22c55e' }, { l: 'COOLING', v: '2,840', c: '#f59e0b' }, { l: 'DEFERRED', v: '1,300', c: 'var(--red)' }].map(({ l, v, c }, i) => (
+                    {[
+  { l: 'TOTAL DONORS', v: mappedDonors.length, c: '#fff' },
+  { l: 'ELIGIBLE', v: eligible, c: '#22c55e' },
+  { l: 'COOLING', v: cooling, c: '#f59e0b' },
+  { l: 'DEFERRED', v: deferred, c: 'var(--red)' }
+].map(({ l, v, c }, i) => (
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
@@ -90,7 +105,7 @@ export default function AdminDonors() {
                             {expanded === d.donor_id && (
                                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} style={{ overflow: 'hidden' }}>
                                     <div style={{ background: 'rgba(217,0,37,0.03)', borderLeft: '3px solid rgba(217,0,37,0.4)', padding: '16px 20px', marginBottom: 4, display: 'flex', gap: 24 }}>
-                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>PHONE</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{d.phone}</div></div>
+                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>PHONE</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{d.phone_no}</div></div>
                                         <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>DISTRICT</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{d.city}</div></div>
                                         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                                             <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text2)' }}>Edit</button>

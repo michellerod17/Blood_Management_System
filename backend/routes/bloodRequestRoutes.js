@@ -13,7 +13,7 @@ router.post('/', (req, res) => {
     const query = `
         INSERT INTO blood_request 
         (hospital_id, patient_id, bank_id, request_date, units_required, status)
-        VALUES (?, ?, ?, CURDATE(), ?, 'Pending')
+        VALUES (?, ?, ?, CURDATE(), ?, 'pending')
     `;
 
     db.query(
@@ -23,9 +23,7 @@ router.post('/', (req, res) => {
 
             if (err) {
                 console.error("POST ERROR:", err);
-                return res.status(500).json({
-                    message: "Server Error"
-                });
+                return res.status(500).json({ message: "Server Error" });
             }
 
             res.status(201).json({
@@ -38,14 +36,13 @@ router.post('/', (req, res) => {
 
 
 // =============================
-// GET ALL BLOOD REQUESTS
+// GET SIMPLE BLOOD REQUESTS
 // =============================
-router.get('/', (req, res) => {
+router.get('/simple', (req, res) => {
 
     const query = `
         SELECT 
             br.request_id,
-            br.hospital_id,
             h.hospital_name,
             br.patient_id,
             p.name AS patient_name,
@@ -66,44 +63,80 @@ router.get('/', (req, res) => {
     db.query(query, (err, results) => {
 
         if (err) {
-            console.error("GET ERROR:", err);
-            return res.status(500).json({
-                message: "Server Error"
-            });
+            console.error("GET SIMPLE ERROR:", err);
+            return res.status(500).json({ message: "Server Error" });
         }
 
         res.json(results);
     });
 });
 
-router.put("/:id/status", async (req, res) => {
-  const { status } = req.body;
-  const requestId = req.params.id;
 
-  try {
-    const [result] = await db.query(
-      "UPDATE blood_request SET status = ? WHERE request_id = ?",
-      [status, requestId]
-    );
+// =============================
+// GET DETAILED BLOOD REQUESTS
+// =============================
+router.get('/detailed', (req, res) => {
 
-    res.json({
-      message: "Request status updated",
-      affectedRows: result.affectedRows
+    const query = `
+        SELECT 
+            br.request_id,
+            br.hospital_id,
+            br.patient_id,
+            br.bank_id,
+            br.units_required,
+
+            CONCAT(UCASE(LEFT(br.status, 1)), LCASE(SUBSTRING(br.status, 2))) AS status,
+            br.request_date,
+
+            h.hospital_name,
+            h.city AS hospital_city,
+
+            p.name AS patient_name,
+            p.blood_group,
+            'General' AS ward,
+
+            bb.bank_name,
+            bb.city AS bank_city,
+
+            'Normal' AS priority
+
+        FROM blood_request br
+
+        LEFT JOIN hospital h 
+            ON br.hospital_id = h.hospital_id
+
+        LEFT JOIN patient p 
+            ON br.patient_id = p.patient_id
+
+        LEFT JOIN blood_bank bb 
+            ON br.bank_id = bb.bank_id
+
+        ORDER BY br.request_date DESC
+    `;
+
+    db.query(query, (err, results) => {
+
+        if (err) {
+            console.error("GET DETAILED ERROR:", err);
+            return res.status(500).json({ message: "Server Error" });
+        }
+
+        res.json(results);
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update request status" });
-  }
 });
+
 
 // =============================
 // UPDATE REQUEST STATUS
-// (Blood Bank Approve / Reject)
 // =============================
 router.put('/:id/status', (req, res) => {
 
     const { status } = req.body;
     const requestId = req.params.id;
+
+    if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+    }
 
     const query = `
         UPDATE blood_request
@@ -111,20 +144,63 @@ router.put('/:id/status', (req, res) => {
         WHERE request_id = ?
     `;
 
-    db.query(query, [status, requestId], (err, result) => {
+    db.query(query, [status.toLowerCase(), requestId], (err) => {
 
         if (err) {
             console.error("UPDATE ERROR:", err);
-            return res.status(500).json({
-                message: "Server Error"
-            });
+            return res.status(500).json({ message: "Server Error" });
         }
 
         res.json({
-            message: "Request status updated successfully"
+            message: `Request ${status} successfully`
         });
     });
+});
 
+
+// =============================
+// QUICK APPROVE
+// =============================
+router.put('/approve/:id', (req, res) => {
+
+    const requestId = req.params.id;
+
+    db.query(
+        "UPDATE blood_request SET status='approved' WHERE request_id=?",
+        [requestId],
+        (err) => {
+
+            if (err) {
+                console.error("APPROVE ERROR:", err);
+                return res.status(500).json({ message: "Server Error" });
+            }
+
+            res.json({ message: "Approved successfully" });
+        }
+    );
+});
+
+
+// =============================
+// QUICK REJECT
+// =============================
+router.put('/reject/:id', (req, res) => {
+
+    const requestId = req.params.id;
+
+    db.query(
+        "UPDATE blood_request SET status='rejected' WHERE request_id=?",
+        [requestId],
+        (err) => {
+
+            if (err) {
+                console.error("REJECT ERROR:", err);
+                return res.status(500).json({ message: "Server Error" });
+            }
+
+            res.json({ message: "Rejected successfully" });
+        }
+    );
 });
 
 

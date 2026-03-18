@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Users, Building2, CreditCard, AlertTriangle, Award, BarChart2, X, Download, Check } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
@@ -20,11 +20,41 @@ export default function AdminReports() {
     const [format, setFormat] = useState('PDF');
     const [generating, setGenerating] = useState(false);
     const [done, setDone] = useState(false);
+    const [requests, setRequests] = useState([]);
+    const [donors, setDonors] = useState([]);
+    useEffect(() => {
+    fetch("http://localhost:5000/blood-requests")
+        .then(res => res.json())
+        .then(data => setRequests(data))
+        .catch(err => console.error(err));
 
+    fetch("http://localhost:5000/donors")
+        .then(res => res.json())
+        .then(data => setDonors(data))
+        .catch(err => console.error(err));
+}, []);
+   const reportData = {
+    totalRequests: requests.length,
+    approved: requests.filter(r => r.status === "approved").length,
+    pending: requests.filter(r => r.status === "pending").length,
+    rejected: requests.filter(r => r.status === "rejected").length,
+    totalDonors: donors.length
+};
     const handleGenerate = () => {
-        setGenerating(true);
-        setTimeout(() => { setGenerating(false); setDone(true); setTimeout(() => { setDone(false); setGenModal(null); }, 2000); }, 2000);
-    };
+    console.log("📊 REPORT DATA:", reportData); // 🔥 real data
+
+    setGenerating(true);
+
+    setTimeout(() => {
+        setGenerating(false);
+        setDone(true);
+
+        setTimeout(() => {
+            setDone(false);
+            setGenModal(null);
+        }, 2000);
+    }, 2000);
+};
 
     return (
         <AdminLayout title="Reports" page="REPORTS">

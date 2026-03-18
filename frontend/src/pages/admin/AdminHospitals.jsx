@@ -1,25 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import StatusBadge from '../../components/hospital/StatusBadge';
-import { mockAllHospitals } from '../../data/adminMockData';
+
 
 export default function AdminHospitals() {
     const [search, setSearch] = useState('');
     const [expanded, setExpanded] = useState(null);
-
-    const filtered = mockAllHospitals.filter(h => !search || h.hospital_name.toLowerCase().includes(search.toLowerCase()) || h.city.toLowerCase().includes(search.toLowerCase()));
-    const active = mockAllHospitals.filter(h => h.status === 'Active').length;
-    const pending = mockAllHospitals.filter(h => h.status === 'Pending').length;
-    const totalReqs = mockAllHospitals.reduce((s, h) => s + h.total_requests, 0);
+    const [hospitals, setHospitals] = useState([]);
+    const filtered = hospitals.filter(h => !search || h.hospital_name.toLowerCase().includes(search.toLowerCase()) || h.city.toLowerCase().includes(search.toLowerCase()));
+    const active = hospitals.length; // no status in backend yet
+    const pending = 0;
+    const totalReqs = 0;
+    
+    useEffect(() => {
+    fetch("http://localhost:5000/hospitals")
+        .then(res => res.json())
+        .then(data => setHospitals(data))
+        .catch(err => console.error(err));
+}, []);
 
     return (
         <AdminLayout title="Hospitals" page="HOSPITALS">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-                    {[{ l: 'TOTAL', v: '340', c: '#fff' }, { l: 'ACTIVE', v: String(active), c: '#22c55e' }, { l: 'PENDING', v: String(pending), c: '#f59e0b' }, { l: 'TOTAL REQUESTS', v: totalReqs.toLocaleString(), c: '#fff' }].map(({ l, v, c }, i) => (
+                    {[{ l: 'TOTAL', v: hospitals.length, c: '#fff' }, { l: 'ACTIVE', v: String(active), c: '#22c55e' }, { l: 'PENDING', v: String(pending), c: '#f59e0b' }, { l: 'TOTAL REQUESTS', v: totalReqs.toLocaleString(), c: '#fff' }].map(({ l, v, c }, i) => (
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
@@ -51,19 +58,19 @@ export default function AdminHospitals() {
                                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff' }}>{h.hospital_id}</div>
                                 <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 600, fontSize: 14, color: '#fff' }}>{h.hospital_name}</div>
                                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text3)' }}>{h.city}</div>
-                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#fff' }}>{h.beds}</div>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.contact_number}</div>
-                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#fff' }}>{h.active_patients}</div>
-                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#fff' }}>{h.total_requests}</div>
-                                <StatusBadge status={h.status} />
+                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#fff' }}>{h.beds || 0}</div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.contact_no}</div>
+                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#fff' }}>{h.total_patients || 0}</div>
+                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: '#fff' }}>{h.total_requests || 0}</div>
+                                <StatusBadge status={h.status || "Active"} />
                                 {expanded === h.hospital_id ? <ChevronUp size={13} color="var(--text3)" /> : <ChevronDown size={13} color="var(--text3)" />}
                             </div>
                             {expanded === h.hospital_id && (
                                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} style={{ overflow: 'hidden' }}>
                                     <div style={{ background: 'rgba(59,130,246,0.03)', borderLeft: '3px solid rgba(59,130,246,0.4)', padding: '16px 20px', marginBottom: 4, display: 'flex', gap: 24, alignItems: 'center' }}>
-                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>CONTACT</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{h.contact_number}</div></div>
-                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>BEDS</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{h.beds}</div></div>
-                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>ACTIVE PATIENTS</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{h.active_patients}</div></div>
+                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>CONTACT</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{h.contact_no}</div></div>
+                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>BEDS</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{h.beds || 0}</div></div>
+                                        <div><div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)' }}>ACTIVE PATIENTS</div><div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#fff' }}>{h.total_patients || 0}</div></div>
                                         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                                             <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text2)' }}>View</button>
                                             <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text2)' }}>Edit</button>
