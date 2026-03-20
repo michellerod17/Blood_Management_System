@@ -17,43 +17,39 @@ export default function AdminApprovals() {
     const [toast, setToast] = useState(null);
     const [approvals, setApprovals] = useState([]);
 useEffect(() => {
-    fetch("http://localhost:5000/blood-requests")
+    fetch("http://localhost:5000/api/admin/approvals")
         .then(res => res.json())
         .then(data => {
 
-            const mapped = data
-    .filter(r => r.status === "pending")   // ✅ ONLY PENDING
-    .map(r => ({
-        id: r.request_id,
-        type: "Hospital",
-        org_name: r.hospital_name,
-        city: "Kerala",
-        submitted: r.request_date,
-        ref: `REQ-${r.request_id}`,
-        contact: r.patient_name,
-        status: "Pending"
-    }));
+            console.log("API DATA:", data); // debug
+
+            const mapped = data.map(r => ({
+                id: r.id,
+                type: "Hospital",
+                org_name: r.hospital_name, // ✅ FIX
+                city: "Kerala",
+                submitted: r.request_date,
+                ref: `REQ-${r.id}`,
+               contact: `Patient: ${r.patient_name || "Unknown"}`, // ✅ FIX
+               status: r.status.toLowerCase()
+            }));
 
             setApprovals(mapped);
-        });
+        })
+        .catch(err => console.error(err));
 }, []);
 
     const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
    const handleApprove = async (id) => {
-    await fetch(`http://localhost:5000/blood-requests/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Approved" })
+    await fetch(`http://localhost:5000/api/admin/approve/${id}`, {
+        method: "PUT"
     });
-
     setApprovals(a => a.filter(x => x.id !== id));
     showToast('Application approved successfully');
 };
-   const handleReject = async () => {
-    await fetch(`http://localhost:5000/blood-requests/${rejectModal}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Rejected" })
+  const handleReject = async () => {
+    await fetch(`http://localhost:5000/api/admin/reject/${rejectModal}`, {
+        method: "PUT"
     });
 
     setApprovals(a => a.filter(x => x.id !== rejectModal));
@@ -63,13 +59,13 @@ useEffect(() => {
 
     const filtered = approvals.filter(a => {
         if (typeFilter !== 'All' && a.type !== typeFilter) return false;
-        if (statusFilter !== 'All' && a.status !== statusFilter) return false;
+        if (statusFilter !== 'All' && a.status !== statusFilter.toLowerCase()) return false;
         if (search && !a.org_name.toLowerCase().includes(search.toLowerCase()) && !a.ref.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
     });
 
-    const pendingC = approvals.filter(a => a.status === 'Pending').length;
-    const reviewC = approvals.filter(a => a.status === 'Approved').length;
+    const pendingC = approvals.filter(a => a.status === 'pending').length;
+    const reviewC = approvals.filter(a => a.status === 'approved').length;
     const iS = { width: '100%', background: '#0A0A12', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '11px 14px', fontFamily: 'var(--font-body)', fontSize: 14, color: '#fff', outline: 'none', boxSizing: 'border-box' };
 
     return (
@@ -114,7 +110,7 @@ useEffect(() => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-                    {[{ l: 'PENDING', v: pendingC, c: 'var(--red)', pulse: true }, { l: 'UNDER REVIEW', v: reviewC, c: '#f59e0b' }, { l: 'APPROVED TODAY', v: 4, c: '#22c55e' }].map(({ l, v, c, pulse }, i) => (
+                    {[{ l: 'PENDING', v: pendingC, c: 'var(--red)', pulse: true }, {  l: 'APPROVED', v: reviewC , c: '#f59e0b' }, { l: 'APPROVED TODAY', v: 4, c: '#22c55e' }].map(({ l, v, c, pulse }, i) => (
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
@@ -129,7 +125,7 @@ useEffect(() => {
                         <button key={t} onClick={() => setTypeFilter(t)} style={{ background: typeFilter === t ? 'var(--red)' : 'rgba(255,255,255,0.05)', border: `1px solid ${typeFilter === t ? 'var(--red)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 100, padding: '5px 14px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, color: typeFilter === t ? '#fff' : 'var(--text2)' }}>{t}</button>
                     ))}
                     <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
-                    {['All', 'Pending', 'Under Review'].map(t => (
+                    {['All', 'pending', 'approved', 'rejected'].map(t => (
                         <button key={t} onClick={() => setStatusFilter(t)} style={{ background: statusFilter === t ? 'rgba(217,0,37,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${statusFilter === t ? 'rgba(217,0,37,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 100, padding: '5px 14px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, color: statusFilter === t ? 'var(--red)' : 'var(--text3)' }}>{t}</button>
                     ))}
                     <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
@@ -143,7 +139,7 @@ useEffect(() => {
                     <AnimatePresence>
                         {filtered.map(a => (
                             <motion.div key={a.id} layout exit={{ scale: 0.9, opacity: 0 }}
-                                style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: 28, borderLeft: a.status === 'Pending' ? '3px solid #D90025' : '3px solid #f59e0b' }}>
+                                style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, padding: 28, borderLeft: a.status === 'pending' ? '3px solid #D90025' : '3px solid #f59e0b' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                                     <div>
                                         <span style={{ background: a.type === 'Hospital' ? 'rgba(59,130,246,0.1)' : 'rgba(217,0,37,0.1)', border: `1px solid ${a.type === 'Hospital' ? 'rgba(59,130,246,0.3)' : 'rgba(217,0,37,0.3)'}`, borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: a.type === 'Hospital' ? '#3b82f6' : 'var(--red)' }}>{a.type}</span>
@@ -156,7 +152,7 @@ useEffect(() => {
                                     </div>
                                 </div>
                                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text3)', marginBottom: 12 }}>{a.contact}</div>
-                                <StatusBadge status={a.status} />
+                                <StatusBadge status={a.status.charAt(0).toUpperCase() + a.status.slice(1)} />
 
                                 {/* Expanded details */}
                                 <div style={{ background: '#0A0A12', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 16, marginTop: 16 }}>

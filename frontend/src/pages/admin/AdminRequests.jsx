@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Download } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
-import PriorityBadge from '../../components/hospital/PriorityBadge';
 import StatusBadge from '../../components/hospital/StatusBadge';
 import BloodGroupBadge from '../../components/hospital/BloodGroupBadge';
 
@@ -20,14 +19,15 @@ export default function AdminRequests() {
     const [search, setSearch] = useState('');
 
     // 🔥 FETCH DATA
-    useEffect(() => {
-        fetch("http://localhost:5000/blood-requests")
-            .then(res => res.json())
-            .then(data => {
-                console.log("API DATA:", data); // debug
-                setRequests(data);
-            });
-    }, []);
+   useEffect(() => {
+    fetch("http://127.0.0.1:5000/api/admin/requests")
+        .then(res => res.json())
+        .then(data => {
+            console.log("DATA:", data);
+            setRequests(data);
+        })
+        .catch(err => console.error("ERROR:", err));
+}, []);
 
     // 🔥 FORMAT STATUS (IMPORTANT)
     const formatStatus = (status) =>
@@ -57,7 +57,7 @@ export default function AdminRequests() {
         if (
             search &&
             !r.patient_name?.toLowerCase().includes(search.toLowerCase()) &&
-            !String(r.request_id).toLowerCase().includes(search.toLowerCase())
+            !String(r.id).toLowerCase().includes(search.toLowerCase())
         ) return false;
 
         return true;
@@ -161,45 +161,81 @@ export default function AdminRequests() {
                     }}>
 
                     {/* HEADER */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '100px 1fr 1fr 120px 80px 60px 100px 100px',
-                        gap: 10,
-                        borderBottom: '1px solid #222',
-                        paddingBottom: 10
-                    }}>
+                    {/* HEADER */}
+<div style={{
+    display: 'grid',
+    gridTemplateColumns: '100px 1fr 1fr 120px 80px 60px 100px 100px',
+    gap: 10,
+    paddingBottom: 12,
+    marginBottom: 6,
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: 10,
+    padding: '10px 12px',
+    border: '1px solid rgba(255,255,255,0.05)'
+}}>
                         {['ID', 'HOSPITAL', 'BANK', 'PATIENT', 'BLOOD', 'QTY', 'PRIORITY', 'STATUS']
-                            .map(h => <div key={h}>{h}</div>)}
+    .map(h => (
+        <div key={h} style={{
+            fontSize: 11,
+            letterSpacing: '1px',
+            color: '#9CA3AF',
+            fontWeight: 500
+        }}>
+            {h}
+        </div>
+    ))}
                     </div>
 
                     {/* DATA */}
                     {filtered.map(r => (
-                        <div key={r.request_id} style={{
-                            display: 'grid',
-                            gridTemplateColumns: '100px 1fr 1fr 120px 80px 60px 100px 100px',
-                            gap: 10,
-                            padding: '12px 0',
-                            borderBottom: '1px solid #111'
-                        }}>
+                        <div
+  key={r.id}
+  style={{
+    display: 'grid',
+    gridTemplateColumns: '100px 1fr 1fr 120px 80px 60px 100px 100px',
+    gap: 10,
+    padding: '12px 0',
+    borderBottom: '1px solid #111',
+    cursor: 'pointer',
+    transition: '0.2s'
+  }}
+  onMouseEnter={(e) => e.currentTarget.style.background = '#111'}
+  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+>
                             <div>
-                                {r.request_id}
+                                <div style={{ fontWeight: 500, color: '#ccc' }}>
+  {r.id}
+</div>
                                 <div style={{ fontSize: 10, color: '#777' }}>
                                     {fmt(r.request_date || r.created_at)}
                                 </div>
                             </div>
 
-                            <div>{r.hospital_name || "N/A"}</div>
-                            <div>{r.bank_name || "N/A"}</div>
+                            <div>{r.hospital || "N/A"}</div>
+                            <div>{r.blood_bank || "N/A"}</div>
                             <div>{r.patient_name || "N/A"}</div>
 
                             <BloodGroupBadge group={r.blood_group || "N/A"} small />
-                            <div>{r.units_required}</div>
+                            <div>{r.quantity}</div>
 
-                            <PriorityBadge priority={r.priority || "Normal"} />
-                            <StatusBadge status={formatStatus(r.status)} />
+                            <div>-</div>
+                            <div style={{
+  display: 'flex',
+  alignItems: 'center'
+}}>
+  <StatusBadge status={formatStatus(r.status)} />
+</div>
                         </div>
                     ))}
-
+      {filtered.length === 0 && (
+  <div style={{
+    padding: 20,
+    textAlign: 'center',
+    color: '#666'
+  }}>
+    No requests found
+  </div>
+)}
                 </motion.div>
 
             </div>

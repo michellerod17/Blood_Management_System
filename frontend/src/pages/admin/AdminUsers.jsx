@@ -1,17 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { Search, Shield, Building2, Droplets, User, X, Copy, Check } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
-import { mockSystemUsers } from '../../data/adminMockData';
+
 
 const roleColors = { 'Super Admin': '#f59e0b', 'Hospital Admin': '#3b82f6', 'Blood Bank Admin': '#22c55e', 'Donor': '#D90025' };
 const roleIcons = { 'Super Admin': Shield, 'Hospital Admin': Building2, 'Blood Bank Admin': Droplets, 'Donor': User };
-const roleCounts = mockSystemUsers.reduce((a, u) => { a[u.role] = (a[u.role] || 0) + 1; return a; }, {});
-const pieData = Object.entries(roleCounts).map(([name, value]) => ({ name, value }));
+
 
 function timeAgo(d) {
-    const now = new Date('2025-01-15T12:00:00');
+    const now = new Date();
     const past = new Date(d);
     const hrs = Math.round((now - past) / 3600000);
     if (hrs < 24) return `${hrs} hours ago`;
@@ -19,13 +18,22 @@ function timeAgo(d) {
 }
 
 export default function AdminUsers() {
+    const [users, setUsers] = useState([]);
+    useEffect(() => {
+    fetch("http://localhost:5000/api/users")
+        .then(res => res.json())
+        .then(data => {
+            console.log("API DATA:", data);
+            setUsers(data);
+        })
+        .catch(err => console.error(err));
+}, []);
     const [roleFilter, setRoleFilter] = useState('All');
     const [search, setSearch] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [toast, setToast] = useState(null);
-
-    const filtered = mockSystemUsers.filter(u => {
+    const filtered = users.filter(u => {
         if (roleFilter !== 'All' && u.role !== roleFilter) return false;
         if (search && !u.name.toLowerCase().includes(search.toLowerCase()) && !u.email.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
@@ -33,7 +41,20 @@ export default function AdminUsers() {
 
     const showToast = msg => { setToast(msg); setTimeout(() => setToast(null), 3000); };
     const tempPw = 'H3m@' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const roleCounts = {
+    'Super Admin': 0,
+    'Hospital Admin': 0,
+    'Blood Bank Admin': 0,
+    'Donor': 0
+};
 
+users.forEach(u => {
+    if (roleCounts[u.role] !== undefined) {
+        roleCounts[u.role]++;
+    }
+});
+
+const pieData = Object.entries(roleCounts).map(([name, value]) => ({ name, value }));
     return (
         <AdminLayout title="Users & Roles" page="USERS">
             <AnimatePresence>
@@ -113,7 +134,12 @@ export default function AdminUsers() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-                    {[{ l: 'TOTAL USERS', v: '1,240' }, { l: 'ACTIVE TODAY', v: '84', c: '#22c55e' }, { l: 'SUPER ADMINS', v: '2', c: 'var(--red)' }, { l: 'PENDING INVITE', v: '3', c: '#f59e0b' }].map(({ l, v, c }, i) => (
+                    {[
+ { l: 'TOTAL USERS', v: users.length },
+ { l: 'ACTIVE TODAY', v: users.length, c: '#22c55e' },
+ { l: 'SUPER ADMINS', v: users.filter(u => u.role === 'Super Admin').length, c: 'var(--red)' },
+ { l: 'PENDING INVITE', v: 0, c: '#f59e0b' }
+].map(({ l, v, c }, i) => (
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
@@ -170,7 +196,7 @@ export default function AdminUsers() {
                     </div>
                     {filtered.map((u, i) => {
                         const RoleIcon = roleIcons[u.role]; const rc = roleColors[u.role]; const ini = u.name.split(' ').map(n => n[0]).join(''); return (
-                            <div key={u.user_id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 120px 1fr 100px 80px 60px 120px', gap: 10, alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 120px 1fr 100px 80px 60px 120px', gap: 10, alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)' }}>{i + 1}</div>
@@ -180,10 +206,20 @@ export default function AdminUsers() {
                                 </div>
                                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text3)' }}>{u.email}</div>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: `${rc}15`, border: `1px solid ${rc}40`, borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: rc }}><RoleIcon size={10} />{u.role}</span>
-                                <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text3)' }}>{u.org}</div>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{u.district}</div>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{timeAgo(u.last_active)}</div>
-                                <span style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 100, padding: '2px 8px', fontFamily: 'var(--font-mono)', fontSize: 9, color: '#22c55e' }}>ACTIVE</span>
+                                <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text3)' }}>-</div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>-</div>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text3)' }}>{timeAgo(u.created_at)}</div>
+                                <span style={{
+    background: 'rgba(34,197,94,0.1)',
+    border: '1px solid rgba(34,197,94,0.25)',
+    borderRadius: 100,
+    padding: '2px 8px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 9,
+    color: '#22c55e'
+}}>
+    {u.status?.toUpperCase()}
+</span>
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 10, color: 'var(--text3)' }}>Edit</button>
                                     <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 10, color: 'var(--text3)' }}>Reset</button>

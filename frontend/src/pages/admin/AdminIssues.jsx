@@ -1,20 +1,46 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AdminLayout from '../../components/admin/AdminLayout';
 import BloodGroupBadge from '../../components/hospital/BloodGroupBadge';
-import { mockAllIssues } from '../../data/adminMockData';
+
 
 function fmt(d) { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
 
 export default function AdminIssues() {
+    const [data, setData] = useState([]);
+
+useEffect(() => {
+    fetch("http://localhost:5000/blood-issues")
+        .then(res => res.json())
+        .then(data => setData(data))
+        .catch(err => console.error(err));
+}, []);
+    const totalIssues = data.length;
+
+const totalUnits = data.reduce(
+    (sum, d) => sum + d.units_issued, 0
+);
+
+const thisMonth = data.filter(d => {
+    const now = new Date();
+    const date = new Date(d.issue_date);
+    return date.getMonth() === now.getMonth() &&
+           date.getFullYear() === now.getFullYear();
+}).length;
     return (
         <AdminLayout title="Blood Issues" page="ISSUES">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-                    {[{ l: 'TOTAL ISSUES', v: '8,102' }, { l: 'UNITS ISSUED', v: '18,420', c: '#22c55e' }, { l: 'THIS MONTH', v: '62' }, { l: 'AVG ISSUE TIME', v: '6.4m', c: '#22c55e' }].map(({ l, v, c }, i) => (
+                    { [
+ { l: 'TOTAL ISSUES', v: totalIssues },
+ { l: 'UNITS ISSUED', v: totalUnits, c: '#22c55e' },
+ { l: 'THIS MONTH', v: thisMonth },
+ { l: 'AVG ISSUE TIME', v: '6.4m', c: '#22c55e' }
+].map(({ l, v, c }, i) => (
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
-                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, color: c || '#fff', lineHeight: 1 }}>{v}</div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, color: c || '#fff', lineHeight: 1 }}>{typeof v === "number" ? v.toLocaleString() : v}</div>
                         </motion.div>
                     ))}
                 </div>
@@ -24,23 +50,44 @@ export default function AdminIssues() {
                     <div style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 1fr 70px 50px 90px', gap: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                         {['ISSUE ID', 'REQUEST', 'HOSPITAL', 'BLOOD BANK', 'BLOOD', 'UNITS', 'DATE'].map(h => <div key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', letterSpacing: '0.08em' }}>{h}</div>)}
                     </div>
-                    {mockAllIssues.map(iss => (
-                        <div key={iss.issue_id} style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 1fr 70px 50px 90px', gap: 10, alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff' }}>{iss.issue_id}</div>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red)' }}>{iss.request_id.replace('REQ-2025-', '')}</div>
-                            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff' }}>{iss.hospital_name}</div>
-                            <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text3)' }}>{iss.bank_name}</div>
-                            <BloodGroupBadge group={iss.blood_group} small />
-                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: '#fff' }}>{iss.units_issued}</div>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)' }}>{fmt(iss.issue_date)}</div>
-                        </div>
-                    ))}
+                   {data.map(iss => (
+    <div key={iss.issue_id} style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 1fr 70px 50px 90px', gap: 10, alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff' }}>
+            ISS-{iss.issue_id}
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--red)' }}>
+            {iss.request_id}
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff' }}>
+            {iss.hospital}
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text3)' }}>
+            {iss.blood_bank}
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#fff' }}>
+            -
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: '#fff' }}>
+            {iss.units_issued}
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)' }}>
+            {fmt(iss.issue_date)}
+        </div>
+    </div>
+))}
 
                     {/* Traceability visual */}
                     <div style={{ marginTop: 24, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 24 }}>
-                        <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 16, color: '#fff', marginBottom: 16 }}>Issue Traceability — {mockAllIssues[0].issue_id}</div>
+                        <div style={{ fontFamily: 'var(--font-sub)', fontWeight: 700, fontSize: 16, color: '#fff', marginBottom: 16 }}>Issue Traceability — {data[0]?.issue_id}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                             {['Donor', 'Donation', 'Stock', 'Request', 'Issue', 'Payment'].map((step, i) => (
                                 <div key={step} style={{ display: 'flex', alignItems: 'center' }}>

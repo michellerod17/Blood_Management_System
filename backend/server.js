@@ -46,8 +46,21 @@ app.use("/hospital-dashboard", hospitalDashboardRoutes);
 // Payment routes
 app.use("/payments", paymentRoutes);
 
-app.use("/admin", adminRoutes);
+app.use("/api/admin", adminRoutes);
 
+const bloodIssueRoutes = require("./routes/bloodIssueRoutes");
+
+app.use("/blood-issues", bloodIssueRoutes);
+
+const adminPaymentRoutes = require("./routes/adminPaymentRoutes.js");
+
+app.use("/admin/payments", adminPaymentRoutes);
+
+const userRoutes = require("./routes/userRoutes");
+app.use("/api/users", userRoutes);
+
+const notificationRoutes = require("./routes/notifications");
+app.use("/api/notifications", notificationRoutes);
 
 // =========================
 // Root Test Route

@@ -1,25 +1,146 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import BloodGroupBadge from '../../components/hospital/BloodGroupBadge';
-import { mockAllBloodBanks, mockDistrictData } from '../../data/adminMockData';
+
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 const genStock = seed => BLOOD_TYPES.map(g => ({ group: g, units: Math.floor(seed * (40 + Math.random() * 120)), capacity: 250, updated: '2025-01-15' }));
 
 export default function AdminInventory() {
     const [expanded, setExpanded] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [selectedDistrict, setSelectedDistrict] = useState('');
+    const [banks, setBanks] = useState([]);
+const [districtData, setDistrictData] = useState([]);
+const [stats, setStats] = useState({
+    totalUnits: 0,
+    criticalTypes: 0,
+    lowStock: 0,
+    avgCapacity: 0
+});
+useEffect(() => {
+    fetchBanks();
+    fetchDistricts();
+}, []);
+const fetchBanks = async () => {
+    try {
+        const res = await fetch("http://localhost:5000/api/admin/inventory")
+        const data = await res.json();
+        console.log("RAW DATA:", data);
+        let totalUnits = 0;
+let criticalTypes = 0;
+let lowStock = 0;
+let totalPercent = 0;
+let count = 0;
 
-    const banks = selectedDistrict ? mockAllBloodBanks.filter(b => b.city === selectedDistrict) : mockAllBloodBanks;
+data.forEach(row => {
+    const units = row.available_units;
+    const capacity = 100; // since we fixed it
 
+    totalUnits += units;
+
+    const pct = capacity ? (units / capacity) * 100 : 0;
+
+    if (pct <= 30) {
+        criticalTypes++;
+    } else if (pct <= 60) {
+        lowStock++;
+    }
+
+    totalPercent += pct;
+    count++;
+});
+
+const avgCapacity = count ? (totalPercent / count).toFixed(1) : 0;
+
+setStats({
+    totalUnits,
+    criticalTypes,
+    lowStock,
+    avgCapacity
+});
+
+const grouped = {};
+
+data.forEach(row => {
+    if (!grouped[row.bank_id]) {
+        grouped[row.bank_id] = {
+            bank_id: row.bank_id,
+            bank_name: row.bank_name,
+            city: row.city,
+            total_units: 0,
+            inventory: []
+        };
+    }
+
+    grouped[row.bank_id].inventory.push({
+        group: row.blood_group,
+        units: row.available_units,
+        capacity: 100,
+        updated: new Date().toISOString().split("T")[0]
+    });
+
+    grouped[row.bank_id].total_units += row.available_units;
+});
+
+setBanks(Object.values(grouped));
+setLoading(false);
+    } catch (err) {
+        console.error(err);
+        setLoading(false);
+    }
+};
+
+const fetchDistricts = async () => {
+    try {
+        const res = await fetch("http://localhost:5000/api/admin/inventory");
+        const data = await res.json();
+
+const districtMap = {};
+
+data.forEach(row => {
+    if (!districtMap[row.city]) {
+        districtMap[row.city] = 0;
+    }
+    districtMap[row.city] += row.available_units;
+});
+
+const formatted = Object.keys(districtMap).map(city => ({
+    district: city,
+    total_units: districtMap[city],
+    status:
+        districtMap[city] > 1000 ? "Healthy" :
+        districtMap[city] > 500 ? "Low" : "Critical"
+}));
+
+setDistrictData(formatted);
+    } catch (err) {
+        console.error(err);
+    }
+};
+    const filteredBanks = selectedDistrict
+    ? banks.filter(b => b.city === selectedDistrict)
+    : banks;
+  if (loading) {
+    return (
+        <AdminLayout title="System Inventory" page="INVENTORY">
+            <div style={{ color: "#fff", padding: 20 }}>Loading...</div>
+        </AdminLayout>
+    );
+}
     return (
         <AdminLayout title="System Inventory" page="INVENTORY">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
-                    {[{ l: 'TOTAL UNITS', v: '42,000' }, { l: 'CRITICAL TYPES', v: '4', c: 'var(--red)' }, { l: 'LOW STOCK', v: '8', c: '#f59e0b' }, { l: 'AVG CAPACITY', v: '27.8%' }].map(({ l, v, c }, i) => (
+                    {[
+  { l: 'TOTAL UNITS', v: stats.totalUnits.toLocaleString() },
+  { l: 'CRITICAL TYPES', v: stats.criticalTypes, c: 'var(--red)' },
+  { l: 'LOW STOCK', v: stats.lowStock, c: '#f59e0b' },
+  { l: 'AVG CAPACITY', v: stats.avgCapacity + '%' }
+].map(({ l, v, c }, i) => (
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
@@ -35,7 +156,7 @@ export default function AdminInventory() {
                     <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text3)', marginBottom: 20 }}>Click a district to filter banks below</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         <button onClick={() => setSelectedDistrict('')} style={{ background: !selectedDistrict ? 'var(--red)' : 'rgba(255,255,255,0.05)', border: `1px solid ${!selectedDistrict ? 'var(--red)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 100, padding: '5px 14px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, color: !selectedDistrict ? '#fff' : 'var(--text2)' }}>All</button>
-                        {mockDistrictData.map(d => {
+                       {districtData.map(d => {
                             const sc = d.status === 'Healthy' ? 'rgba(34,197,94,0.2)' : d.status === 'Low' ? 'rgba(245,158,11,0.2)' : 'rgba(217,0,37,0.2)';
                             const tc = d.status === 'Healthy' ? '#22c55e' : d.status === 'Low' ? '#f59e0b' : 'var(--red)';
                             const sel = selectedDistrict === d.district;
@@ -50,8 +171,8 @@ export default function AdminInventory() {
                 </motion.div>
 
                 {/* Banks inventory grouped */}
-                {banks.map((b, bi) => {
-                    const stock = genStock(b.total_units / 500);
+               {filteredBanks.map((b, bi) => {
+                    const stock = Array.isArray(b.inventory) ? b.inventory : [];
                     const isOpen = expanded === b.bank_id;
                     return (
                         <motion.div key={b.bank_id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + bi * 0.05 }}
@@ -74,7 +195,7 @@ export default function AdminInventory() {
                                         {['BLOOD GRP', 'AVAILABLE', 'CAPACITY', 'PERCENTAGE', 'STATUS', 'UPDATED'].map(h => <div key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', letterSpacing: '0.08em' }}>{h}</div>)}
                                     </div>
                                     {stock.map(st => {
-                                        const pct = Math.round((st.units / st.capacity) * 100);
+                                        const pct = st.capacity ? Math.round((st.units / st.capacity) * 100) : 0;
                                         const stLabel = pct <= 30 ? 'Critical' : pct <= 60 ? 'Low' : 'Healthy';
                                         const stColor = pct <= 30 ? 'var(--red)' : pct <= 60 ? '#f59e0b' : '#22c55e';
                                         return (
