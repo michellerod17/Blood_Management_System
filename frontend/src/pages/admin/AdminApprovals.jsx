@@ -118,7 +118,7 @@ useEffect(() => {
                         <motion.div key={l} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                             style={{ background: '#0F0F17', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 24 }}>
                             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 14 }}>{l}</div>
-                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 52, color: c, lineHeight: 1, animation: pulse ? 'pulse 2s ease-in-out infinite' : 'none' }}>{v}</div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 52, color: c, lineHeight: 1 }}>{v}</div>
                         </motion.div>
                     ))}
                 </div>
