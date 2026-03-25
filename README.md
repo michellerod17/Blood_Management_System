@@ -214,7 +214,7 @@ We use a specific "Dark Premium" design language:
 ### Backend Testing
 ```bash
 cd backend
-npm test  # Note: Test script needs to be configured
+npm test  # Note: Test script needs to be configured and finalised
 ```
 
 ### Frontend Testing
